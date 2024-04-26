@@ -1,0 +1,48 @@
+id: train
+namespace: model
+
+inputs:
+  - id: repo_url
+    required: true
+    type: STRING
+    defaults: https://github.com/cvops-study/RCS-YOLO
+  - id: tag
+    required: false
+    type: STRING
+    defaults: test
+  - id: unprocessed_data_container
+    required: false
+    type: STRING
+    defaults: data-preprocessed-test
+
+tasks:
+  - id: train-data
+    type: io.kestra.core.tasks.flows.WorkingDirectory
+
+    tasks:
+      - id: clone_repository
+        type: io.kestra.plugin.git.Clone
+        branch: main
+        url: "{{ inputs.repo_url }}"
+      - id: load
+        type: io.kestra.plugin.azure.cli.AzCLI
+        commands:
+          - mkdir azure-data
+          - az storage blob download-batch --account-name kestra1cvops -s {{inputs.unprocessed_data_container}} -d azure-data --connection-string '{{ secret('AZURE_CONNECTION_STRING')}}'
+      - id: train_model
+        type: io.kestra.plugin.scripts.python.Commands
+        beforeCommands:
+          - apt-get update
+          - apt-get install -y libglib2.0-0 libgl1
+          - pip install -r requirements.txt
+        commands:
+          - python train.py --workers 2 --batch-size 3 --epochs 5 --device cpu --nosave --notest --data data/br35h.yaml --name model
+        docker:
+          image: python:3.8
+          pullPolicy: IF_NOT_PRESENT
+        warningOnStdErr: false
+      - id: save_model
+        type: io.kestra.plugin.azure.cli.AzCLI
+        commands:
+          - az storage container create -n model-{{inputs.tag}} --connection-string '{{ secret('AZURE_CONNECTION_STRING')}}'
+          - az storage blob upload-batch -s runs/train/model --account-name kestra1cvops -d model-{{inputs.tag}} --overwrite --connection-string '{{ secret('AZURE_CONNECTION_STRING')}}'

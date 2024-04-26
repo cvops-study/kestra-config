@@ -1,0 +1,34 @@
+id: load-data
+namespace: data
+
+inputs:
+  - id: dataset_url
+    required: true
+    type: STRING
+  - id: tag
+    required: false
+    type: STRING
+    defaults: test
+
+tasks:
+  - id: wdir
+    type: io.kestra.core.tasks.flows.WorkingDirectory
+
+    tasks:
+      - id: download-kaggle-dataset
+        type: io.kestra.plugin.scripts.shell.Commands
+        runner: PROCESS
+        commands:
+          - wget -O brain_tumor_dataset.zip "{{inputs.dataset_url}}"
+
+      - id: extract-zip
+        type: io.kestra.plugin.scripts.shell.Commands
+        commands:
+          - unzip brain_tumor_dataset.zip -d brain_tumor_dataset
+        runner: PROCESS
+
+      - id: load
+        type: io.kestra.plugin.azure.cli.AzCLI
+        commands:
+          - az storage container create -n data-{{inputs.tag}} --connection-string '{{ secret('AZURE_CONNECTION_STRING')}}'
+          - az storage blob upload-batch -s brain_tumor_dataset --account-name kestra1cvops -d data-{{inputs.tag}} --overwrite --connection-string '{{ secret('AZURE_CONNECTION_STRING')}}'
