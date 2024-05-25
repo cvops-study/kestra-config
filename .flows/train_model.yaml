@@ -6,14 +6,19 @@ inputs:
     required: true
     type: STRING
     defaults: https://github.com/cvops-study/RCS-YOLO
+  - id: repo_branch
+    required: true
+    type: STRING
+    defaults: no-data
   - id: tag
     required: false
     type: STRING
     defaults: test
   - id: unprocessed_data_container
-    required: false
+    required: true
     type: STRING
     defaults: data-preprocessed-test
+
 
 tasks:
   - id: train-data
@@ -22,13 +27,23 @@ tasks:
     tasks:
       - id: clone_repository
         type: io.kestra.plugin.git.Clone
-        branch: main
+        branch: "{{ inputs.repo_branch }}"
         url: "{{ inputs.repo_url }}"
       - id: load
         type: io.kestra.plugin.azure.cli.AzCLI
         commands:
           - mkdir azure-data
-          - az storage blob download-batch --account-name kestra1cvops -s {{inputs.unprocessed_data_container}} -d azure-data --connection-string '{{ secret('AZURE_CONNECTION_STRING')}}'
+          - az storage blob download-batch --account-name '{{ secret('STORAGE_ACCOUNT_NAME')}}' -s {{inputs.unprocessed_data_container}} -d azure-data --connection-string '{{ secret('STORAGE_CONNECTION_STRING')}}'
+      - id: data_config
+        type: io.kestra.plugin.scripts.shell.Script
+        script: |
+          echo "train: azure-data/traindata" >> azure-data-config.yaml
+          echo "val: azure-data/traindata" >> azure-data-config.yaml
+          echo "nc: 1" >> azure-data-config.yaml
+          echo "names: ['Brain Tumor']" >> azure-data-config.yaml
+          echo "Result:"
+          cat azure-data-config.yaml
+
       - id: train_model
         type: io.kestra.plugin.scripts.python.Commands
         beforeCommands:
@@ -36,7 +51,7 @@ tasks:
           - apt-get install -y libglib2.0-0 libgl1
           - pip install -r requirements.txt
         commands:
-          - python train.py --workers 2 --batch-size 3 --epochs 5 --device cpu --nosave --notest --data data/br35h.yaml --name model
+          - python train.py --workers 2 --batch-size 3 --epochs 5 --device cpu --nosave --notest --name model  --cache-images --data azure-data-config.yaml
         docker:
           image: python:3.8
           pullPolicy: IF_NOT_PRESENT
@@ -44,5 +59,13 @@ tasks:
       - id: save_model
         type: io.kestra.plugin.azure.cli.AzCLI
         commands:
-          - az storage container create -n model-{{inputs.tag}} --connection-string '{{ secret('AZURE_CONNECTION_STRING')}}'
-          - az storage blob upload-batch -s runs/train/model --account-name kestra1cvops -d model-{{inputs.tag}} --overwrite --connection-string '{{ secret('AZURE_CONNECTION_STRING')}}'
+          - az storage container create -n model-{{inputs.tag}} --connection-string '{{ secret('STORAGE_CONNECTION_STRING')}}'
+          - az storage blob upload-batch -s runs/train/model --account-name '{{ secret('STORAGE_ACCOUNT_NAME')}}' -d model-{{inputs.tag}} --overwrite --connection-string '{{ secret('STORAGE_CONNECTION_STRING')}}'
+      - id: trigger-next
+        type: io.kestra.plugin.fs.http.Request
+        method: POST
+        uri: "{{ secret('KESTRA_BASE_API')}}/api/v1/executions/model/test"
+        contentType: multipart/form-data
+        formData:
+          tag: '{{ inputs.tag }}'
+          model_container: 'model-{{ inputs.tag }}'

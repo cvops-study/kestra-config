@@ -58,11 +58,12 @@ services:
                     tmp-dir:
                       path: /tmp/kestra-wd/tmp
                   url: http://localhost:8080/
-            SECRET_AZURE_CONNECTION_STRING: 'RGVmYXVsdEVuZHBvaW50c1Byb3RvY29sPWh0dHBzO0FjY291bnROYW1lPWtlc3RyYTFjdm9wcztBY2NvdW50S2V5PVlyei8zU1VoUVV4VG9GbDJ4NjhVWnZIbkloMGhWWHNqNkJadm9FeUNqZGdidEdTRndkU3JaSmxnUjl0SlBJSW8xYzM5dDBpaVNXOGorQVN0QVcyVFBBPT07RW5kcG9pbnRTdWZmaXg9Y29yZS53aW5kb3dzLm5ldA=='
+            SECRET_STORAGE_CONNECTION_STRING: ''
+            SECRET_STORAGE_ACCOUNT_NAME: ''
+            SECRET_KESTRA_BASE_API: ''
         ports:
             - "8080:8080"
             - "8081:8081"
-        mem_limit: 10g
         depends_on:
             postgres:
                 condition: service_started
