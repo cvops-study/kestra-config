@@ -15,7 +15,7 @@ tasks:
     type: io.kestra.core.tasks.flows.WorkingDirectory
 
     tasks:
-      - id: download-kaggle-dataset
+      - id: download-dataset
         type: io.kestra.plugin.scripts.shell.Commands
         runner: PROCESS
         commands:
@@ -30,5 +30,5 @@ tasks:
       - id: load
         type: io.kestra.plugin.azure.cli.AzCLI
         commands:
-          - az storage container create -n data-{{inputs.tag}} --connection-string '{{ secret('AZURE_CONNECTION_STRING')}}'
-          - az storage blob upload-batch -s brain_tumor_dataset --account-name kestra1cvops -d data-{{inputs.tag}} --overwrite --connection-string '{{ secret('AZURE_CONNECTION_STRING')}}'
+          - az storage container create -n data-{{inputs.tag}} --connection-string '{{ secret('STORAGE_CONNECTION_STRING')}}'
+          - az storage blob upload-batch -s brain_tumor_dataset --account-name '{{ secret('STORAGE_ACCOUNT_NAME')}}' -d data-{{inputs.tag}} --overwrite --connection-string '{{ secret('STORAGE_CONNECTION_STRING')}}'
