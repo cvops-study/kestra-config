@@ -21,20 +21,20 @@ inputs:
 
 
 tasks:
-  - id: train-data
+  - id: working-directory
     type: io.kestra.core.tasks.flows.WorkingDirectory
 
     tasks:
-      - id: clone_repository
+      - id: clone-repository
         type: io.kestra.plugin.git.Clone
         branch: "{{ inputs.repo_branch }}"
         url: "{{ inputs.repo_url }}"
-      - id: load
+      - id: download-data
         type: io.kestra.plugin.azure.cli.AzCLI
         commands:
           - mkdir azure-data
           - az storage blob download-batch --account-name '{{ secret('STORAGE_ACCOUNT_NAME')}}' -s {{inputs.unprocessed_data_container}} -d azure-data --connection-string '{{ secret('STORAGE_CONNECTION_STRING')}}'
-      - id: data_config
+      - id: configure-data
         type: io.kestra.plugin.scripts.shell.Script
         script: |
           echo "train: azure-data/traindata" >> azure-data-config.yaml
@@ -44,7 +44,7 @@ tasks:
           echo "Result:"
           cat azure-data-config.yaml
 
-      - id: train_model
+      - id: train-model
         type: io.kestra.plugin.scripts.python.Commands
         beforeCommands:
           - apt-get update
@@ -56,12 +56,12 @@ tasks:
           image: python:3.8
           pullPolicy: IF_NOT_PRESENT
         warningOnStdErr: false
-      - id: save_model
+      - id: upload-model
         type: io.kestra.plugin.azure.cli.AzCLI
         commands:
           - az storage container create -n model-{{inputs.tag}} --connection-string '{{ secret('STORAGE_CONNECTION_STRING')}}'
           - az storage blob upload-batch -s runs/train/model --account-name '{{ secret('STORAGE_ACCOUNT_NAME')}}' -d model-{{inputs.tag}} --overwrite --connection-string '{{ secret('STORAGE_CONNECTION_STRING')}}'
-      - id: trigger-next
+      - id: trigger-test-model
         type: io.kestra.plugin.fs.http.Request
         method: POST
         uri: "{{ secret('KESTRA_BASE_API')}}/api/v1/executions/model/test"

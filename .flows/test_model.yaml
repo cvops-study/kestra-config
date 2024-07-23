@@ -24,25 +24,25 @@ inputs:
     defaults: data-preprocessed-test
 
 tasks:
-  - id: test-model
+  - id: working-directory
     type: io.kestra.core.tasks.flows.WorkingDirectory
 
     tasks:
-      - id: clone_repository
+      - id: clone-repository
         type: io.kestra.plugin.git.Clone
         branch: "{{ inputs.repo_branch }}"
         url: "{{ inputs.repo_url }}"
-      - id: load_model
+      - id: download-model
         type: io.kestra.plugin.azure.cli.AzCLI
         commands:
           - mkdir azure-model
           - az storage blob download-batch --account-name '{{ secret('STORAGE_ACCOUNT_NAME')}}' -s {{inputs.model_container}} -d azure-model --connection-string '{{ secret('STORAGE_CONNECTION_STRING')}}'
-      - id: load_data
+      - id: download-data
         type: io.kestra.plugin.azure.cli.AzCLI
         commands:
           - mkdir azure-data
           - az storage blob download-batch --account-name '{{ secret('STORAGE_ACCOUNT_NAME')}}' -s {{inputs.data_container}} -d azure-data --connection-string '{{ secret('STORAGE_CONNECTION_STRING')}}'
-      - id: data_config
+      - id: configure-data
         type: io.kestra.plugin.scripts.shell.Script
         script: |
           echo "train: azure-data/traindata" >> azure-data-config.yaml
@@ -51,7 +51,7 @@ tasks:
           echo "names: ['Brain Tumor']" >> azure-data-config.yaml
           echo "Result:"
           cat azure-data-config.yaml
-      - id: test_model
+      - id: test-model
         type: io.kestra.plugin.scripts.python.Commands
         beforeCommands:
           - apt-get update
@@ -63,7 +63,7 @@ tasks:
           image: python:3.8
           pullPolicy: IF_NOT_PRESENT
         warningOnStdErr: false
-      - id: save_results
+      - id: upload-results
         type: io.kestra.plugin.azure.cli.AzCLI
         commands:
           - az storage container create -n model-test-{{inputs.tag}} --connection-string '{{ secret('STORAGE_CONNECTION_STRING')}}'

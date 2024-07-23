@@ -11,7 +11,7 @@ inputs:
     defaults: test
 
 tasks:
-  - id: wdir
+  - id: working-directory
     type: io.kestra.core.tasks.flows.WorkingDirectory
 
     tasks:
@@ -21,13 +21,13 @@ tasks:
         commands:
           - wget -O brain_tumor_dataset.zip "{{inputs.dataset_url}}"
 
-      - id: extract-zip
+      - id: extract-dataset
         type: io.kestra.plugin.scripts.shell.Commands
         commands:
           - unzip brain_tumor_dataset.zip -d brain_tumor_dataset
         runner: PROCESS
 
-      - id: load
+      - id: upload-data
         type: io.kestra.plugin.azure.cli.AzCLI
         commands:
           - az storage container create -n data-{{inputs.tag}} --connection-string '{{ secret('STORAGE_CONNECTION_STRING')}}'
